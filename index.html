@@ -102,7 +102,7 @@
                     </div>
                 </div>
                 
-                <div id="p2-question" class="text-6xl md:text-8xl font-black text-center mb-4 md:mb-6 text-slate-800 drop-shadow-sm tracking-tight"></div>
+                <div id="p2-question" class="text-5xl md:text-6xl font-black text-center mb-2 md:mb-4 text-slate-800 drop-shadow-sm tracking-tight"></div>
                 
                 <div id="p2-board" class="flex-1 grid grid-cols-2 gap-3 md:gap-6 pb-2">
                     <!-- Buttons injected via JS -->
@@ -110,7 +110,7 @@
             </div>
 
             <!-- TUG OF WAR ARENA (MIDDLE DIVIDER) -->
-            <div class="h-28 md:h-40 bg-green-200 relative border-y-8 border-slate-800 flex justify-center overflow-visible z-10 shadow-[0_0_30px_rgba(0,0,0,0.3)] shrink-0">
+            <div class="h-40 md:h-64 bg-green-200 relative border-y-8 border-slate-800 flex justify-center overflow-visible z-10 shadow-[0_0_30px_rgba(0,0,0,0.3)] shrink-0">
                 <!-- Grass Pattern Decor -->
                 <div class="absolute inset-0 opacity-30" style="background-image: radial-gradient(#15803d 2px, transparent 2px); background-size: 20px 20px;"></div>
                 
@@ -136,11 +136,16 @@
                     <div class="h-3 w-32 md:w-48 bg-sky-200 rounded-full overflow-hidden border-2 border-sky-300">
                         <div id="p1-timer" class="h-full bg-sky-500 w-full transition-all duration-100 ease-linear"></div>
                     </div>
-                    <!-- Small Quit Button accessible to P1 who set up the game -->
-                    <button onclick="goHome()" class="px-4 py-2 bg-slate-300 hover:bg-slate-400 text-slate-700 rounded-lg font-bold shadow-sm active:translate-y-1">Menu</button>
+                    <!-- Menu & Fullscreen Buttons accessible to P1 who set up the game -->
+                    <div class="flex items-center gap-2">
+                        <button onclick="toggleFullScreen()" class="p-2 bg-slate-300 hover:bg-slate-400 text-slate-700 rounded-lg shadow-sm active:translate-y-1" title="Toggle Full Screen">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+                        </button>
+                        <button onclick="goHome()" class="px-4 py-2 bg-slate-300 hover:bg-slate-400 text-slate-700 rounded-lg font-bold shadow-sm active:translate-y-1">Menu</button>
+                    </div>
                 </div>
                 
-                <div id="p1-question" class="text-6xl md:text-8xl font-black text-center mb-4 md:mb-6 text-slate-800 drop-shadow-sm tracking-tight"></div>
+                <div id="p1-question" class="text-5xl md:text-6xl font-black text-center mb-2 md:mb-4 text-slate-800 drop-shadow-sm tracking-tight"></div>
                 
                 <div id="p1-board" class="flex-1 grid grid-cols-2 gap-3 md:gap-6 pb-2">
                     <!-- Buttons injected via JS -->
@@ -179,7 +184,7 @@
         const PULL_AMOUNT = 10;     // How far flag moves on win (percentage)
         const PENALTY_AMOUNT = 5;   // Rope slips this much on wrong answer
         const PENALTY_TIME = 1500;  // ms board locks on wrong answer
-        const QUESTION_TIMEOUT = 12000; // Time before auto-skipping question
+        const QUESTION_TIMEOUT = 20000; // Increased to 20 seconds for more thinking time
         
         const gameState = {
             view: 'start', 
@@ -495,16 +500,16 @@
             p2Board.innerHTML = '';
             
             gameState.currentQuestion.options.forEach(opt => {
-                // P1 Button
+                // P1 Button - text slightly scaled down to fit larger arena
                 const btn1 = document.createElement('button');
-                btn1.className = 'w-full h-full bg-sky-500 text-white text-5xl md:text-7xl font-black rounded-2xl md:rounded-3xl shadow-[0_8px_0_#0284c7] touch-btn flex items-center justify-center select-none';
+                btn1.className = 'w-full h-full bg-sky-500 text-white text-4xl md:text-5xl font-black rounded-2xl md:rounded-3xl shadow-[0_8px_0_#0284c7] touch-btn flex items-center justify-center select-none';
                 btn1.innerText = opt;
                 attachInteraction(btn1, 'p1', opt);
                 p1Board.appendChild(btn1);
 
-                // P2 Button
+                // P2 Button - text slightly scaled down to fit larger arena
                 const btn2 = document.createElement('button');
-                btn2.className = 'w-full h-full bg-red-500 text-white text-5xl md:text-7xl font-black rounded-2xl md:rounded-3xl shadow-[0_8px_0_#b91c1c] touch-btn flex items-center justify-center select-none';
+                btn2.className = 'w-full h-full bg-red-500 text-white text-4xl md:text-5xl font-black rounded-2xl md:rounded-3xl shadow-[0_8px_0_#b91c1c] touch-btn flex items-center justify-center select-none';
                 btn2.innerText = opt;
                 attachInteraction(btn2, 'p2', opt);
                 p2Board.appendChild(btn2);
