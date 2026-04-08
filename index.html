@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Head-to-Head Math Tug-of-War</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Comic Neue', cursive; 
+            /* Critical for iPad: prevents pull-to-refresh, swiping back, and pinch-zoom */
+            overscroll-behavior-y: none;
+            touch-action: none;
+            margin: 0;
+            padding: 0;
+            background-color: #0f172a;
+        }
+        
+        .no-select {
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-8px); }
+            40%, 80% { transform: translateX(8px); }
+        }
+        .shake-animation { animation: shake 0.4s ease-in-out; }
+        
+        @keyframes bob {
+            0%, 100% { transform: translateY(-50%) rotate(-5deg); }
+            50% { transform: translateY(-50%) rotate(5deg) scale(1.1); }
+        }
+        .bobbing { animation: bob 2s infinite; }
+
+        .touch-btn:active {
+            transform: translateY(6px);
+            box-shadow: none !important;
+        }
+        
+        .disabled-board {
+            opacity: 0.6;
+            pointer-events: none;
+            filter: grayscale(0.8);
+        }
+    </style>
+</head>
+<body class="no-select text-slate-800 w-screen h-[100dvh] overflow-hidden fixed inset-0">
+
+    <div id="app" class="relative w-full h-full bg-slate-900 flex flex-col overflow-hidden">
+        
+        <!-- ================= START VIEW ================= -->
+        <div id="view-start" class="absolute inset-0 z-50 bg-sky-100 flex flex-col items-center justify-center p-6">
+            <div class="bg-white p-8 rounded-3xl shadow-2xl border-4 border-sky-300 max-w-2xl w-full text-center">
+                <div class="flex items-center justify-center gap-6 mb-2">
+                    <span class="text-6xl md:text-7xl drop-shadow-md transform -scale-x-100">🐱</span>
+                    <span class="text-5xl font-black text-slate-300">VS</span>
+                    <span class="text-6xl md:text-7xl drop-shadow-md">🐶</span>
+                </div>
+                
+                <h1 class="text-5xl md:text-6xl font-black text-sky-600 mb-2 drop-shadow-sm tracking-tight">Math Tug-of-War</h1>
+                <p class="text-xl md:text-2xl text-slate-600 mb-6 font-bold bg-yellow-100 inline-block px-4 py-2 rounded-lg border-2 border-yellow-300">
+                    ⬇️ Lay iPad flat between 2 players ⬆️
+                </p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 w-full mb-6">
+                    <button onclick="startGame('tens')" class="p-4 md:p-5 bg-orange-400 text-white rounded-2xl text-2xl md:text-3xl font-bold shadow-[0_6px_0_#c2410c] touch-btn">
+                        1. Adding Tens
+                    </button>
+                    <button onclick="startGame('make10')" class="p-4 md:p-5 bg-green-400 text-white rounded-2xl text-2xl md:text-3xl font-bold shadow-[0_6px_0_#15803d] touch-btn">
+                        2. Make a Ten
+                    </button>
+                    <button onclick="startGame('noRegrouping')" class="p-4 md:p-5 bg-blue-400 text-white rounded-2xl text-2xl md:text-3xl font-bold shadow-[0_6px_0_#1d4ed8] touch-btn">
+                        3. Split & Jump
+                    </button>
+                    <button onclick="startGame('regrouping')" class="p-4 md:p-5 bg-purple-400 text-white rounded-2xl text-2xl md:text-3xl font-bold shadow-[0_6px_0_#6b21a8] touch-btn">
+                        4. Compensation
+                    </button>
+                </div>
+
+                <div class="flex justify-center">
+                    <button onclick="toggleFullScreen()" class="px-6 py-3 bg-slate-800 text-white rounded-full font-bold shadow-lg flex items-center gap-2 active:bg-slate-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+                        Full Screen Mode
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= GAME VIEW (BATTLESHIP LAYOUT) ================= -->
+        <div id="view-game" class="hidden flex-1 flex flex-col h-full w-full bg-slate-900 relative">
+            
+            <!-- PLAYER 2 ZONE (TOP HALF - ROTATED 180 DEG) -->
+            <div id="p2-area" class="flex-1 flex flex-col bg-red-50 p-4 relative rotate-180 transform transition-all duration-300">
+                <div class="flex justify-between items-center mb-2 md:mb-4">
+                    <span class="text-2xl md:text-3xl font-black text-red-500 uppercase tracking-widest">Player 2 🐱</span>
+                    <!-- Timeout Bar for P2 -->
+                    <div class="h-3 w-32 md:w-48 bg-red-200 rounded-full overflow-hidden border-2 border-red-300">
+                        <div id="p2-timer" class="h-full bg-red-500 w-full transition-all duration-100 ease-linear"></div>
+                    </div>
+                </div>
+                
+                <div id="p2-question" class="text-6xl md:text-8xl font-black text-center mb-4 md:mb-6 text-slate-800 drop-shadow-sm tracking-tight"></div>
+                
+                <div id="p2-board" class="flex-1 grid grid-cols-2 gap-3 md:gap-6 pb-2">
+                    <!-- Buttons injected via JS -->
+                </div>
+            </div>
+
+            <!-- TUG OF WAR ARENA (MIDDLE DIVIDER) -->
+            <div class="h-28 md:h-40 bg-green-200 relative border-y-8 border-slate-800 flex justify-center overflow-visible z-10 shadow-[0_0_30px_rgba(0,0,0,0.3)] shrink-0">
+                <!-- Grass Pattern Decor -->
+                <div class="absolute inset-0 opacity-30" style="background-image: radial-gradient(#15803d 2px, transparent 2px); background-size: 20px 20px;"></div>
+                
+                <!-- Vertical Rope -->
+                <div class="w-4 md:w-6 h-full bg-amber-700 absolute left-1/2 -ml-2 md:-ml-3 z-10 border-x-2 border-amber-900 shadow-lg"></div>
+                <div class="w-1.5 md:w-2 h-full bg-amber-600/50 absolute left-1/2 -ml-0.5 md:-ml-1 z-10"></div>
+                
+                <!-- Characters (Positioned at edges pulling the rope) -->
+                <!-- P2 (Cat) at Top edge -->
+                <div id="p2-char" class="absolute top-0 left-1/2 ml-6 text-6xl md:text-8xl -mt-6 rotate-180 z-20 drop-shadow-xl transition-transform duration-100 transform -scale-x-100">🐱</div>
+                <!-- P1 (Dog) at Bottom edge -->
+                <div id="p1-char" class="absolute bottom-0 left-1/2 -ml-20 md:-ml-28 text-6xl md:text-8xl -mb-6 z-20 drop-shadow-xl transition-transform duration-100">🐶</div>
+                
+                <!-- The Flag -->
+                <div id="flag" class="absolute left-1/2 -ml-8 md:-ml-10 text-5xl md:text-7xl z-30 transition-all duration-200 ease-out drop-shadow-lg bobbing" style="top: 50%;">🚩</div>
+            </div>
+
+            <!-- PLAYER 1 ZONE (BOTTOM HALF - NORMAL) -->
+            <div id="p1-area" class="flex-1 flex flex-col bg-sky-50 p-4 relative transition-all duration-300">
+                <div class="flex justify-between items-center mb-2 md:mb-4">
+                    <span class="text-2xl md:text-3xl font-black text-sky-600 uppercase tracking-widest">🐶 Player 1</span>
+                    <!-- Timeout Bar for P1 -->
+                    <div class="h-3 w-32 md:w-48 bg-sky-200 rounded-full overflow-hidden border-2 border-sky-300">
+                        <div id="p1-timer" class="h-full bg-sky-500 w-full transition-all duration-100 ease-linear"></div>
+                    </div>
+                    <!-- Small Quit Button accessible to P1 who set up the game -->
+                    <button onclick="goHome()" class="px-4 py-2 bg-slate-300 hover:bg-slate-400 text-slate-700 rounded-lg font-bold shadow-sm active:translate-y-1">Menu</button>
+                </div>
+                
+                <div id="p1-question" class="text-6xl md:text-8xl font-black text-center mb-4 md:mb-6 text-slate-800 drop-shadow-sm tracking-tight"></div>
+                
+                <div id="p1-board" class="flex-1 grid grid-cols-2 gap-3 md:gap-6 pb-2">
+                    <!-- Buttons injected via JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= RESULT VIEW (SPLIT SCREEN) ================= -->
+        <div id="view-result" class="hidden absolute inset-0 z-50 flex flex-col bg-slate-900">
+            <!-- P2 Result Side (Rotated) -->
+            <div class="flex-1 flex flex-col items-center justify-center p-8 rotate-180 relative" id="p2-result-bg">
+                <h2 id="p2-result-title" class="text-6xl md:text-8xl font-black text-white mb-8 drop-shadow-xl text-center"></h2>
+                <div class="flex gap-6 z-10">
+                    <button onclick="startGame(gameState.strategy)" class="px-8 py-5 bg-white/20 hover:bg-white/30 text-white font-bold text-3xl rounded-2xl backdrop-blur-sm border-2 border-white/50 touch-btn">Rematch</button>
+                    <button onclick="goHome()" class="px-8 py-5 bg-black/40 hover:bg-black/60 text-white font-bold text-3xl rounded-2xl backdrop-blur-sm border-2 border-white/20 touch-btn">Menu</button>
+                </div>
+            </div>
+            
+            <!-- Center Divider Line -->
+            <div class="h-4 w-full bg-slate-950 z-20 shadow-[0_0_20px_rgba(0,0,0,0.8)]"></div>
+            
+            <!-- P1 Result Side (Normal) -->
+            <div class="flex-1 flex flex-col items-center justify-center p-8 relative" id="p1-result-bg">
+                <h2 id="p1-result-title" class="text-6xl md:text-8xl font-black text-white mb-8 drop-shadow-xl text-center"></h2>
+                <div class="flex gap-6 z-10">
+                    <button onclick="startGame(gameState.strategy)" class="px-8 py-5 bg-white/20 hover:bg-white/30 text-white font-bold text-3xl rounded-2xl backdrop-blur-sm border-2 border-white/50 touch-btn">Rematch</button>
+                    <button onclick="goHome()" class="px-8 py-5 bg-black/40 hover:bg-black/60 text-white font-bold text-3xl rounded-2xl backdrop-blur-sm border-2 border-white/20 touch-btn">Menu</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= JAVASCRIPT LOGIC ================= -->
+    <script>
+        // --- CONFIG & STATE ---
+        const PULL_AMOUNT = 10;     // How far flag moves on win (percentage)
+        const PENALTY_AMOUNT = 5;   // Rope slips this much on wrong answer
+        const PENALTY_TIME = 1500;  // ms board locks on wrong answer
+        const QUESTION_TIMEOUT = 12000; // Time before auto-skipping question
+        
+        const gameState = {
+            view: 'start', 
+            strategy: '',
+            flagPos: 50, // 0 is top (P2 side), 100 is bottom (P1 side)
+            currentQuestion: null,
+            p1Locked: false,
+            p2Locked: false,
+            timeLeft: 0,
+            lastTick: 0,
+            animFrame: null
+        };
+
+        // --- FULLSCREEN API ---
+        function toggleFullScreen() {
+            const doc = window.document;
+            const docEl = doc.documentElement;
+            const requestFullScreen = docEl.requestFullscreen || docEl.webkitRequestFullScreen || docEl.msRequestFullscreen;
+            const cancelFullScreen = doc.exitFullscreen || doc.webkitExitFullscreen || doc.msExitFullscreen;
+
+            if (!doc.fullscreenElement && !doc.webkitFullscreenElement && !doc.msFullscreenElement) {
+                if (requestFullScreen) requestFullScreen.call(docEl).catch(err => console.log(err));
+            } else {
+                if (cancelFullScreen) cancelFullScreen.call(doc);
+            }
+        }
+
+        // --- CORE GAME LOOP ---
+        function startGame(strategy) {
+            gameState.strategy = strategy;
+            gameState.flagPos = 50; 
+            gameState.p1Locked = false;
+            gameState.p2Locked = false;
+            
+            document.getElementById('p1-area').classList.remove('disabled-board', 'shake-animation', 'bg-red-100');
+            document.getElementById('p2-area').classList.remove('disabled-board', 'shake-animation', 'bg-red-100');
+            document.getElementById('p1-area').classList.add('bg-sky-50');
+            document.getElementById('p2-area').classList.add('bg-red-50');
+            
+            gameState.view = 'game';
+            renderView();
+            nextQuestion();
+        }
+
+        function nextQuestion() {
+            gameState.p1Locked = false;
+            gameState.p2Locked = false;
+            
+            document.getElementById('p1-area').classList.remove('disabled-board', 'bg-red-100');
+            document.getElementById('p2-area').classList.remove('disabled-board', 'bg-red-100');
+            document.getElementById('p1-area').classList.add('bg-sky-50');
+            document.getElementById('p2-area').classList.add('bg-red-50');
+            
+            gameState.currentQuestion = generateQuestion(gameState.strategy);
+            updateBoardUI();
+            startQuestionTimer();
+        }
+
+        function startQuestionTimer() {
+            cancelAnimationFrame(gameState.animFrame);
+            gameState.timeLeft = QUESTION_TIMEOUT;
+            gameState.lastTick = performance.now();
+            
+            const tick = (now) => {
+                const delta = now - gameState.lastTick;
+                gameState.lastTick = now;
+                gameState.timeLeft -= delta;
+                
+                const pct = Math.max(0, (gameState.timeLeft / QUESTION_TIMEOUT) * 100);
+                
+                // Update both progress bars synchronously
+                document.getElementById('p1-timer').style.width = pct + '%';
+                document.getElementById('p2-timer').style.width = pct + '%';
+                
+                if (gameState.timeLeft <= 0) {
+                    flashQuestionText();
+                    nextQuestion();
+                } else {
+                    gameState.animFrame = requestAnimationFrame(tick);
+                }
+            };
+            gameState.animFrame = requestAnimationFrame(tick);
+        }
+
+        function flashQuestionText() {
+            const q1 = document.getElementById('p1-question');
+            const q2 = document.getElementById('p2-question');
+            q1.classList.add('opacity-0', 'scale-90');
+            q2.classList.add('opacity-0', 'scale-90');
+            setTimeout(() => {
+                q1.classList.remove('opacity-0', 'scale-90');
+                q2.classList.remove('opacity-0', 'scale-90');
+            }, 200);
+        }
+
+        function goHome() {
+            cancelAnimationFrame(gameState.animFrame);
+            gameState.view = 'start';
+            renderView();
+        }
+
+        function endGame(winner) {
+            cancelAnimationFrame(gameState.animFrame);
+            
+            const p1Title = document.getElementById('p1-result-title');
+            const p2Title = document.getElementById('p2-result-title');
+            const p1Bg = document.getElementById('p1-result-bg');
+            const p2Bg = document.getElementById('p2-result-bg');
+            
+            if (winner === 'p1') {
+                p1Title.innerText = '🏆 You Win! 🐶';
+                p2Title.innerText = 'You Lose! 💦';
+                p1Bg.className = 'flex-1 flex flex-col items-center justify-center p-8 relative bg-sky-600';
+                p2Bg.className = 'flex-1 flex flex-col items-center justify-center p-8 rotate-180 relative bg-slate-800';
+            } else {
+                p1Title.innerText = 'You Lose! 💦';
+                p2Title.innerText = '🏆 You Win! 🐱';
+                p1Bg.className = 'flex-1 flex flex-col items-center justify-center p-8 relative bg-slate-800';
+                p2Bg.className = 'flex-1 flex flex-col items-center justify-center p-8 rotate-180 relative bg-red-600';
+            }
+            
+            gameState.view = 'result';
+            renderView();
+            createConfetti(winner === 'p1' ? 'bottom' : 'top');
+        }
+
+        // --- MATH GENERATION ---
+        function getRandomInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+        function generateQuestion(strategy) {
+            let q;
+            switch(strategy) {
+                case 'tens': q = generateTens(); break;
+                case 'make10': q = generateMake10(); break;
+                case 'noRegrouping': q = generateNoRegrouping(); break;
+                case 'regrouping': q = generateRegrouping(); break;
+            }
+            q.options = getDistractors(q.ans, q.op === '+', q.num1, q.num2);
+            return q;
+        }
+
+        function generateTens() {
+            if (Math.random() > 0.5) {
+                let a = getRandomInt(1, 8) * 10;
+                let b = getRandomInt(1, 9 - a/10) * 10;
+                return { num1: a, num2: b, op: '+', ans: a+b };
+            } else {
+                let a = getRandomInt(2, 9) * 10;
+                let b = getRandomInt(1, a/10) * 10;
+                return { num1: a, num2: b, op: '-', ans: a-b };
+            }
+        }
+
+        function generateMake10() {
+            if (Math.random() > 0.5) {
+                let a = getRandomInt(1, 8) * 10 + getRandomInt(7, 9);
+                let b = getRandomInt(2, 9);
+                if (a + b > 100) b = 100 - a;
+                if (a + b === a) b = 2; 
+                return { num1: a, num2: b, op: '+', ans: a+b };
+            } else {
+                let a = getRandomInt(2, 9) * 10 + getRandomInt(0, 3);
+                let b = getRandomInt(4, 9);
+                if (a % 10 >= b) b = (a % 10) + 1;
+                return { num1: a, num2: b, op: '-', ans: a-b };
+            }
+        }
+
+        function generateNoRegrouping() {
+            if (Math.random() > 0.5) {
+                let aTens = getRandomInt(1, 8), aOnes = getRandomInt(1, 8);
+                let bTens = getRandomInt(1, 9 - aTens), bOnes = getRandomInt(1, 9 - aOnes);
+                let a = aTens*10 + aOnes, b = bTens*10 + bOnes;
+                return { num1: a, num2: b, op: '+', ans: a+b };
+            } else {
+                let aTens = getRandomInt(2, 9), aOnes = getRandomInt(2, 9);
+                let bTens = getRandomInt(1, aTens - 1), bOnes = getRandomInt(1, aOnes); 
+                let a = aTens*10 + aOnes, b = bTens*10 + bOnes;
+                return { num1: a, num2: b, op: '-', ans: a-b };
+            }
+        }
+
+        function generateRegrouping() {
+            if (Math.random() > 0.5) {
+                let aTens = getRandomInt(1, 7), aOnes = getRandomInt(2, 9);
+                let bTens = getRandomInt(1, 8 - aTens);
+                let bOnes = getRandomInt(10 - aOnes > 9 ? 9 : 10 - aOnes, 9);
+                let a = aTens*10 + aOnes, b = bTens*10 + bOnes;
+                return { num1: a, num2: b, op: '+', ans: a+b };
+            } else {
+                let aTens = getRandomInt(2, 9), aOnes = getRandomInt(0, 7);
+                let bTens = getRandomInt(1, aTens - 1), bOnes = getRandomInt(aOnes + 1, 9);
+                let a = aTens*10 + aOnes, b = bTens*10 + bOnes;
+                return { num1: a, num2: b, op: '-', ans: a-b };
+            }
+        }
+
+        function getDistractors(ans, isAdd, a, b) {
+            let options = new Set();
+            options.add(ans);
+            if (ans + 10 <= 100) options.add(ans + 10);
+            if (ans - 10 >= 0) options.add(ans - 10);
+            if (isAdd && a - b >= 0) options.add(a - b);
+            if (!isAdd && a + b <= 100) options.add(a + b);
+            
+            let attempts = 0;
+            while(options.size < 4 && attempts < 50) {
+                let r = ans + getRandomInt(-12, 12);
+                if (r >= 0 && r <= 100) options.add(r);
+                attempts++;
+            }
+            let val = 0;
+            while(options.size < 4) { options.add(val++); }
+            return Array.from(options).slice(0, 4).sort(() => Math.random() - 0.5);
+        }
+
+        // --- INTERACTION ---
+        function attachInteraction(btn, player, opt) {
+            btn.addEventListener('pointerdown', (e) => {
+                e.preventDefault(); // Prevents double-tap zoom
+                handleAnswer(player, opt);
+            });
+        }
+
+        function handleAnswer(player, opt) {
+            if (gameState.view !== 'game') return;
+            if (player === 'p1' && gameState.p1Locked) return;
+            if (player === 'p2' && gameState.p2Locked) return;
+
+            const isCorrect = (opt === gameState.currentQuestion.ans);
+
+            if (isCorrect) {
+                // Correct Answer!
+                if (player === 'p1') {
+                    // Pull down towards P1 (increase percentage towards 100%)
+                    gameState.flagPos += PULL_AMOUNT; 
+                    animateCharacter('p1-char', 'translate-y-4 scale-110');
+                } else {
+                    // Pull up towards P2 (decrease percentage towards 0%)
+                    gameState.flagPos -= PULL_AMOUNT; 
+                    animateCharacter('p2-char', 'translate-y-4 scale-110'); // Rotated, so y is flipped contextually
+                }
+                
+                updateRopeUI();
+                flashQuestionText();
+                
+                // Check win (100 is bottom/P1 win, 0 is top/P2 win)
+                if (gameState.flagPos >= 90) endGame('p1');
+                else if (gameState.flagPos <= 10) endGame('p2');
+                else nextQuestion();
+                
+            } else {
+                // Wrong Answer Penalty
+                const areaId = player === 'p1' ? 'p1-area' : 'p2-area';
+                const area = document.getElementById(areaId);
+                
+                if (player === 'p1') {
+                    gameState.p1Locked = true;
+                    gameState.flagPos -= PENALTY_AMOUNT; // Slips up towards P2
+                } else {
+                    gameState.p2Locked = true;
+                    gameState.flagPos += PENALTY_AMOUNT; // Slips down towards P1
+                }
+                
+                updateRopeUI();
+                
+                area.classList.remove('bg-sky-50', 'bg-red-50');
+                area.classList.add('disabled-board', 'shake-animation', 'bg-red-100');
+                setTimeout(() => area.classList.remove('shake-animation'), 400);
+                
+                setTimeout(() => {
+                    if (player === 'p1') {
+                        gameState.p1Locked = false;
+                        if(gameState.view === 'game') area.classList.replace('bg-red-100', 'bg-sky-50');
+                    } else {
+                        gameState.p2Locked = false;
+                        if(gameState.view === 'game') area.classList.replace('bg-red-100', 'bg-red-50');
+                    }
+                    if(gameState.view === 'game') area.classList.remove('disabled-board');
+                }, PENALTY_TIME);
+            }
+        }
+
+        function updateRopeUI() {
+            // Keep visually between 5% and 95% until win screen
+            const visualPos = Math.max(5, Math.min(95, gameState.flagPos));
+            document.getElementById('flag').style.top = visualPos + '%';
+        }
+
+        function animateCharacter(id, classes) {
+            const el = document.getElementById(id);
+            const classList = classes.split(' ');
+            el.classList.add(...classList);
+            setTimeout(() => el.classList.remove(...classList), 200);
+        }
+
+        // --- RENDERERS ---
+        function renderView() {
+            document.getElementById('view-start').classList.toggle('hidden', gameState.view !== 'start');
+            document.getElementById('view-game').classList.toggle('hidden', gameState.view !== 'game');
+            document.getElementById('view-result').classList.toggle('hidden', gameState.view !== 'result');
+        }
+
+        function updateBoardUI() {
+            const qStr = `${gameState.currentQuestion.num1} ${gameState.currentQuestion.op} ${gameState.currentQuestion.num2}`;
+            document.getElementById('p1-question').innerText = qStr;
+            document.getElementById('p2-question').innerText = qStr;
+            updateRopeUI();
+            
+            const p1Board = document.getElementById('p1-board');
+            const p2Board = document.getElementById('p2-board');
+            p1Board.innerHTML = '';
+            p2Board.innerHTML = '';
+            
+            gameState.currentQuestion.options.forEach(opt => {
+                // P1 Button
+                const btn1 = document.createElement('button');
+                btn1.className = 'w-full h-full bg-sky-500 text-white text-5xl md:text-7xl font-black rounded-2xl md:rounded-3xl shadow-[0_8px_0_#0284c7] touch-btn flex items-center justify-center select-none';
+                btn1.innerText = opt;
+                attachInteraction(btn1, 'p1', opt);
+                p1Board.appendChild(btn1);
+
+                // P2 Button
+                const btn2 = document.createElement('button');
+                btn2.className = 'w-full h-full bg-red-500 text-white text-5xl md:text-7xl font-black rounded-2xl md:rounded-3xl shadow-[0_8px_0_#b91c1c] touch-btn flex items-center justify-center select-none';
+                btn2.innerText = opt;
+                attachInteraction(btn2, 'p2', opt);
+                p2Board.appendChild(btn2);
+            });
+        }
+
+        // --- EFFECTS ---
+        function createConfetti(side) {
+            const colors = ['#fff', '#38bdf8', '#f87171', '#fbbf24', '#34d399'];
+            const screenW = window.innerWidth;
+            const screenH = window.innerHeight;
+            
+            const originY = side === 'bottom' ? screenH * 0.75 : screenH * 0.25;
+            const originX = screenW / 2;
+
+            for (let i = 0; i < 80; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'fixed w-4 h-4 rounded-sm z-[100] pointer-events-none';
+                confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                document.body.appendChild(confetti);
+                
+                const angle = Math.random() * Math.PI * 2;
+                const velocity = 30 + Math.random() * 50;
+                const vx = Math.cos(angle) * velocity;
+                let vy = Math.sin(angle) * velocity - (side === 'bottom' ? 20 : -20);
+                
+                let x = originX;
+                let y = originY;
+                let opacity = 1;
+                let rotation = Math.random() * 360;
+                let rotSpeed = (Math.random() - 0.5) * 20;
+                
+                const animate = () => {
+                    vy += (side === 'bottom' ? 1.5 : -1.5); // Gravity falls towards the winner's edge
+                    x += vx;
+                    y += vy;
+                    opacity -= 0.015;
+                    rotation += rotSpeed;
+                    
+                    confetti.style.transform = `translate(${x}px, ${y}px) rotate(${rotation}deg)`;
+                    confetti.style.opacity = opacity;
+                    
+                    if (opacity > 0) requestAnimationFrame(animate);
+                    else confetti.remove();
+                };
+                requestAnimationFrame(animate);
+            }
+        }
+
+        // Block all native multi-touch gestures globally
+        document.addEventListener('DOMContentLoaded', () => {
+            document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+            document.addEventListener('gesturestart', e => e.preventDefault());
+            renderView();
+        });
+    </script>
+</body>
+</html>
